@@ -335,19 +335,34 @@ def admin_query(question, history):
     STATE['last_action'] = f'سؤال إداري: {q[:60]}'
     return '', history
 
-    with gr.Tab("🧑‍💼 محادثة الإدارة"):
-        gr.Markdown("## اسأل الوكيل عن أداء الشركة")
-        gr.Markdown("يمكنك السؤال بالعربية أو الإنجليزية عن العملاء، المبيعات، الأماكن، الوقت، والاقتراحات التشغيلية.")
-        admin_chatbot = gr.Chatbot(label="مساعد الإدارة", height=460)
-        with gr.Row():
-            admin_input = gr.Textbox(label="سؤال الإدارة", placeholder="كم عدد العملاء؟ من العميل المميز؟ ما أكثر مكان به بيع؟", scale=5)
-            admin_send = gr.Button("اسأل", variant="primary", scale=1)
-        admin_send.click(admin_query, [admin_input, admin_chatbot], [admin_input, admin_chatbot])
-        admin_input.submit(admin_query, [admin_input, admin_chatbot], [admin_input, admin_chatbot])
-        gr.Markdown("### جداول مرجعية للإدارة")
-        gr.Dataframe(value=PREVIEW_CUSTOMER_PURCHASES, label="العملاء والمشتريات", interactive=False)
-        gr.Dataframe(value=PREVIEW_MONTHLY_SALES, label="المبيعات الشهرية", interactive=False)
-        gr.Dataframe(value=PREVIEW_PLACE_SALES, label="المبيعات حسب المكان", interactive=False)
+PREVIEW_ORDERS = pd.DataFrame([
+    {"order_id": 1, "phone": "01000000000", "created_at": "2026-11-20T10:00:00Z", "amount": 850},
+    {"order_id": 2, "phone": "01000000000", "created_at": "2026-10-18T12:00:00Z", "amount": 600},
+    {"order_id": 3, "phone": "01000000001", "created_at": "2026-11-05T15:00:00Z", "amount": 420},
+    {"order_id": 4, "phone": "DASHBOARD_TEST_CUSTOMER", "created_at": "2026-11-22T09:00:00Z", "amount": 250},
+])
+PREVIEW_ORDER_ITEMS = pd.DataFrame([
+    {"order_id": 1, "product_name": "Product A"},
+    {"order_id": 1, "product_name": "Product B"},
+    {"order_id": 2, "product_name": "Product A"},
+    {"order_id": 3, "product_name": "Product B"},
+])
+
+
+def marketing_recommendation_preview():
+    try:
+        from recommendation_engine import recommendation_report
+        report = recommendation_report(PREVIEW_ORDERS, PREVIEW_ORDER_ITEMS, pd.DataFrame(PREVIEW_EVENTS), pd.DataFrame(PRODUCTS))
+        rfm = report["rfm"].copy()
+        actions = pd.DataFrame(report["actions"])
+        rules = report["association_rules"].copy()
+        if not actions.empty:
+            actions["approval_required"] = actions["approval_required"].map({True: "نعم", False: "لا"})
+        summary = "تم تشغيل RFM وتقسيم العملاء وتوقع الشراء وخطر التسرب وقواعد المنتجات المرتبطة.\n"
+        summary += "الحملات لا تُرسل تلقائيًا؛ كل إجراء يحتاج موافقة بشرية."
+        return summary, rfm, rules, actions
+    except Exception as error:
+        return f"تعذر تشغيل محرك التوصيات: {error}", pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 
 with gr.Blocks(title="Company AI Agent Advanced Preview") as demo:
@@ -363,6 +378,19 @@ with gr.Blocks(title="Company AI Agent Advanced Preview") as demo:
         start_btn.click(start_whatsapp_ui, outputs=whatsapp_status)
         stop_btn.click(stop_whatsapp_ui, outputs=whatsapp_status)
         gr.Markdown("### حالة النظام\nالمعاينة تعمل ببيانات تجريبية. قبل الإنتاج أضف Ollama وMeta ومصدر البيانات من تبويب الإعدادات.")
+    with gr.Tab("🧑‍💼 محادثة الإدارة"):
+        gr.Markdown("## اسأل الوكيل عن أداء الشركة")
+        gr.Markdown("يمكنك السؤال بالعربية أو الإنجليزية عن العملاء، المبيعات، الأماكن، الوقت، والاقتراحات التشغيلية.")
+        admin_chatbot = gr.Chatbot(label="مساعد الإدارة", height=460)
+        with gr.Row():
+            admin_input = gr.Textbox(label="سؤال الإدارة", placeholder="كم عدد العملاء؟ من العميل المميز؟ ما أكثر مكان به بيع؟", scale=5)
+            admin_send = gr.Button("اسأل", variant="primary", scale=1)
+        admin_send.click(admin_query, [admin_input, admin_chatbot], [admin_input, admin_chatbot])
+        admin_input.submit(admin_query, [admin_input, admin_chatbot], [admin_input, admin_chatbot])
+        gr.Markdown("### جداول مرجعية للإدارة")
+        gr.Dataframe(value=PREVIEW_CUSTOMER_PURCHASES, label="العملاء والمشتريات", interactive=False)
+        gr.Dataframe(value=PREVIEW_MONTHLY_SALES, label="المبيعات الشهرية", interactive=False)
+        gr.Dataframe(value=PREVIEW_PLACE_SALES, label="المبيعات حسب المكان", interactive=False)
     with gr.Tab("💬 المحادثات"):
         chatbot = gr.Chatbot(label="Company AI Assistant", height=480)
         with gr.Row():
@@ -370,6 +398,15 @@ with gr.Blocks(title="Company AI Agent Advanced Preview") as demo:
             send_btn = gr.Button("إرسال", variant="primary", scale=1)
         send_btn.click(chat_with_agent, [message_input, chatbot], [message_input, chatbot])
         message_input.submit(chat_with_agent, [message_input, chatbot], [message_input, chatbot])
+    with gr.Tab("🎯 التوصيات التسويقية"):
+        gr.Markdown("## توصيات تسويقية مبنية على بيانات المبيعات")
+        gr.Markdown("RFM، تقسيم العملاء، المنتجات المرتبطة، احتمال الشراء، خطر التسرب، وإجراءات مقترحة بدرجة ثقة. الإرسال يحتاج موافقة بشرية.")
+        rec_btn = gr.Button("تشغيل محرك التوصيات", variant="primary")
+        rec_summary = gr.Textbox(label="حالة التحليل", lines=3)
+        rec_rfm = gr.Dataframe(label="RFM وتقسيم العملاء", interactive=False)
+        rec_rules = gr.Dataframe(label="المنتجات التي تُشترى معًا", interactive=False)
+        rec_actions = gr.Dataframe(label="الإجراءات التسويقية المقترحة", interactive=False)
+        rec_btn.click(marketing_recommendation_preview, outputs=[rec_summary, rec_rfm, rec_rules, rec_actions])
     with gr.Tab("🔧 الأدوات"):
         gr.Markdown("## أدوات تشغيلية إضافية")
         with gr.Row():

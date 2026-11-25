@@ -20,6 +20,7 @@ Local Autonomous AI Agent for WhatsApp with Arabic and English support.
 - Per-customer locking and daily message limits
 - Explainable automatic recommendations for operations
 - Management chat for customer and sales questions
+- Explainable marketing recommendation engine
 - Local diagnostics and language tests
 
 ## Analytics and MySQL
@@ -33,6 +34,19 @@ The management interface can answer questions such as:
 - Which place has the highest sales?
 - What are the sales totals by month or by place?
 - What actions do you recommend?
+
+## Marketing recommendations
+
+The project now includes a dependency-light recommendation engine in `recommendation_engine.py`. It provides:
+
+- RFM recency/frequency/monetary scoring and segments: VIP, loyal, new, price-sensitive, and at-risk.
+- Product-pair association rules with support, confidence, and lift; this is the small-data baseline for FP-Growth/Apriori.
+- Content-based product recommendations for customers with limited history.
+- Transparent purchase-propensity and churn-risk scores.
+- Marketing actions with priority, reason, confidence, and `approval_required=true`.
+- MySQL schema for `order_items`, `marketing_campaigns`, `campaign_results`, and `recommendations`.
+
+The production upgrade path is to train CatBoost/LightGBM models when labeled purchase data is sufficient, then add uplift modeling and contextual bandits after campaign results are collected. The system does not send campaigns, change prices, or alter inventory automatically.
 
 Recommendations do not make purchases, send broadcasts, or change inventory automatically. They are suggestions for human review.
 
@@ -82,7 +96,7 @@ The Flask webhook listens on port `5000` by default.
 
 ## Preview
 
-`preview_app.py` provides a safe Gradio preview with separate tables for customers, products, locations, time periods, events, customer purchases, monthly sales, place sales, and recommendations. It also includes a dedicated management chat tab that answers business questions in Arabic or English. The preview does not connect to WhatsApp or a real MySQL server and does not store real secrets.
+`preview_app.py` provides a safe Gradio preview with separate tables for customers, products, locations, time periods, events, customer purchases, monthly sales, place sales, and recommendations. It includes a management chat tab and a marketing recommendation tab showing RFM segments, product associations, and approval-required actions. The preview does not connect to WhatsApp or a real MySQL server and does not store real secrets.
 
 ## Project status
 

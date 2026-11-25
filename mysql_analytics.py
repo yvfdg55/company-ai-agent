@@ -59,6 +59,57 @@ CREATE TABLE IF NOT EXISTS orders (
     CONSTRAINT fk_orders_customer FOREIGN KEY (phone) REFERENCES customers(phone)
         ON DELETE CASCADE
 ) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS order_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    quantity DECIMAL(12,2) NOT NULL DEFAULT 1,
+    unit_price DECIMAL(12,2) NULL,
+    INDEX idx_order_items_order (order_id),
+    INDEX idx_order_items_product (product_name),
+    CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS marketing_campaigns (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    channel VARCHAR(80) NOT NULL DEFAULT 'whatsapp',
+    status VARCHAR(40) NOT NULL DEFAULT 'draft',
+    created_at DATETIME NOT NULL,
+    INDEX idx_campaign_status_date (status, created_at)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS campaign_results (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    campaign_id BIGINT NOT NULL,
+    phone VARCHAR(64) NOT NULL,
+    assigned_variant VARCHAR(120) NULL,
+    sent_at DATETIME NULL,
+    opened_at DATETIME NULL,
+    clicked_at DATETIME NULL,
+    converted_at DATETIME NULL,
+    revenue DECIMAL(12,2) NULL,
+    INDEX idx_campaign_results_campaign (campaign_id),
+    INDEX idx_campaign_results_phone (phone),
+    CONSTRAINT fk_campaign_results_campaign FOREIGN KEY (campaign_id) REFERENCES marketing_campaigns(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_campaign_results_customer FOREIGN KEY (phone) REFERENCES customers(phone)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS recommendations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    phone VARCHAR(64) NULL,
+    recommendation_type VARCHAR(80) NOT NULL,
+    product_name VARCHAR(255) NULL,
+    action TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    score DECIMAL(6,4) NULL,
+    status VARCHAR(40) NOT NULL DEFAULT 'pending_approval',
+    created_at DATETIME NOT NULL,
+    INDEX idx_recommendations_status (status),
+    INDEX idx_recommendations_phone (phone),
+    CONSTRAINT fk_recommendations_customer FOREIGN KEY (phone) REFERENCES customers(phone)
+        ON DELETE SET NULL
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS tickets (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     phone VARCHAR(64) NOT NULL,
