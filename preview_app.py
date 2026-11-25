@@ -284,6 +284,72 @@ def preview_analytics(days=30):
 
 
 
+PREVIEW_MONTHLY_SALES = pd.DataFrame([
+    {"month": "2026-09", "orders": 8, "sales": 2140},
+    {"month": "2026-10", "orders": 11, "sales": 3290},
+    {"month": "2026-11", "orders": 9, "sales": 2475},
+])
+PREVIEW_PLACE_SALES = pd.DataFrame([
+    {"place": "القاهرة", "orders": 12, "sales": 3860},
+    {"place": "الإسكندرية", "orders": 8, "sales": 2140},
+    {"place": "الجيزة", "orders": 5, "sales": 1905},
+])
+PREVIEW_CUSTOMER_PURCHASES = pd.DataFrame([
+    {"phone": "01000000000", "customer": "عميل تجريبي 1", "orders": 6, "purchases": 1850},
+    {"phone": "01000000001", "customer": "Test Customer", "orders": 2, "purchases": 420},
+    {"phone": "DASHBOARD_TEST_CUSTOMER", "customer": "عميل لوحة التحكم", "orders": 1, "purchases": 250},
+])
+
+
+def admin_query(question, history):
+    q = str(question or '').strip()
+    if not q:
+        return '', history
+    low = q.casefold()
+    total_customers = len(CUSTOMERS)
+    top = PREVIEW_CUSTOMER_PURCHASES.sort_values(['purchases', 'orders'], ascending=False).iloc[0]
+    top_place = PREVIEW_PLACE_SALES.sort_values('sales', ascending=False).iloc[0]
+    total_sales = int(PREVIEW_MONTHLY_SALES['sales'].sum())
+    recommendations = [
+        'تابع العميل المميز بعرض مخصص للحفاظ عليه.',
+        'ركز الحملات على القاهرة لأنها أعلى مكان في المبيعات.',
+        'راقب نمو المبيعات شهريًا وراجع المنتجات ذات المشاهدات دون طلبات.',
+    ]
+    if any(x in q for x in ['اقتراح', 'توصي', 'إجراء', 'recommend', 'action']):
+        answer = 'اقتراحات الإدارة:\n' + '\n'.join(f'- {x}' for x in recommendations)
+    elif any(x in q for x in ['عدد العملاء', 'كم عميل', 'customers', 'customer count']):
+        answer = f'عدد العملاء المسجلين حاليًا: {total_customers} عميل.'
+    elif any(x in q for x in ['مميز', 'أعلى عميل', 'top customer', 'best customer']):
+        answer = f"العميل المميز: {top['customer']}\nعدد طلباته: {int(top['orders'])}\nحجم مشترياته: {int(top['purchases']):,}"
+    elif any(x in q for x in ['كل شهر', 'شهري', 'monthly', 'month']):
+        answer = 'حجم المبيعات حسب الشهر:\n' + '\n'.join(f"- {r['month']}: {int(r['sales']):,} من {int(r['orders'])} طلبات" for _, r in PREVIEW_MONTHLY_SALES.iterrows())
+    elif any(x in q for x in ['كل مكان', 'مكان', 'مدينة', 'place', 'city', 'location']):
+        answer = 'حجم المبيعات حسب المكان:\n' + '\n'.join(f"- {r['place']}: {int(r['sales']):,} من {int(r['orders'])} طلبات" for _, r in PREVIEW_PLACE_SALES.iterrows())
+        answer += f"\n\nأعلى مكان: {top_place['place']} بإجمالي {int(top_place['sales']):,}."
+    elif any(x in q for x in ['إجمالي المبيعات', 'حجم المبيعات', 'total sales', 'sales']):
+        answer = f'إجمالي المبيعات في البيانات التجريبية: {total_sales:,}.'
+    else:
+        answer = 'أستطيع الإجابة عن: عدد العملاء، العميل المميز وحجم مشترياته، أكثر مكان بيعًا، المبيعات الشهرية، المبيعات حسب المكان، والاقتراحات.'
+    history = history or []
+    history.extend([{'role': 'user', 'content': q}, {'role': 'assistant', 'content': answer}])
+    STATE['last_action'] = f'سؤال إداري: {q[:60]}'
+    return '', history
+
+    with gr.Tab("🧑‍💼 محادثة الإدارة"):
+        gr.Markdown("## اسأل الوكيل عن أداء الشركة")
+        gr.Markdown("يمكنك السؤال بالعربية أو الإنجليزية عن العملاء، المبيعات، الأماكن، الوقت، والاقتراحات التشغيلية.")
+        admin_chatbot = gr.Chatbot(label="مساعد الإدارة", height=460)
+        with gr.Row():
+            admin_input = gr.Textbox(label="سؤال الإدارة", placeholder="كم عدد العملاء؟ من العميل المميز؟ ما أكثر مكان به بيع؟", scale=5)
+            admin_send = gr.Button("اسأل", variant="primary", scale=1)
+        admin_send.click(admin_query, [admin_input, admin_chatbot], [admin_input, admin_chatbot])
+        admin_input.submit(admin_query, [admin_input, admin_chatbot], [admin_input, admin_chatbot])
+        gr.Markdown("### جداول مرجعية للإدارة")
+        gr.Dataframe(value=PREVIEW_CUSTOMER_PURCHASES, label="العملاء والمشتريات", interactive=False)
+        gr.Dataframe(value=PREVIEW_MONTHLY_SALES, label="المبيعات الشهرية", interactive=False)
+        gr.Dataframe(value=PREVIEW_PLACE_SALES, label="المبيعات حسب المكان", interactive=False)
+
+
 with gr.Blocks(title="Company AI Agent Advanced Preview") as demo:
     gr.HTML("""<div id='main-header' dir='rtl'><h1>🤖 مركز التحكم المتقدم بالوكيل الذكي</h1><p>Company AI Agent Advanced Control Center</p><span>معاينة آمنة ببيانات تجريبية — لا توجد اتصالات حقيقية</span></div>""")
     with gr.Tab("📊 الرئيسية"):

@@ -19,11 +19,20 @@ Local Autonomous AI Agent for WhatsApp with Arabic and English support.
 - Meta webhook signature verification
 - Per-customer locking and daily message limits
 - Explainable automatic recommendations for operations
+- Management chat for customer and sales questions
 - Local diagnostics and language tests
 
 ## Analytics and MySQL
 
-SQLite remains the default local database, so the agent can run without MySQL. The optional `mysql_analytics.py` module adds a central MySQL store with tables for customers, products, customer events, orders, and tickets. The analytics layer produces customer totals, locations, products, event types, orders, tickets, daily/hourly activity, and deterministic recommendations with a priority, action, and measured reason.
+SQLite remains the default local database, so the agent can run without MySQL. The optional `mysql_analytics.py` module adds a central MySQL store with tables for customers, products, customer events, orders, and tickets. The analytics layer produces customer totals, locations, products, event types, orders, tickets, daily/hourly activity, monthly sales, sales by place, top customers, and deterministic recommendations with a priority, action, and measured reason.
+
+The management interface can answer questions such as:
+
+- How many customers are registered?
+- Who is the best customer and how much did they purchase?
+- Which place has the highest sales?
+- What are the sales totals by month or by place?
+- What actions do you recommend?
 
 Recommendations do not make purchases, send broadcasts, or change inventory automatically. They are suggestions for human review.
 
@@ -73,7 +82,7 @@ The Flask webhook listens on port `5000` by default.
 
 ## Preview
 
-`preview_app.py` provides a safe Gradio preview with separate tables for customers, products, locations, time periods, events, and recommendations. The preview does not connect to WhatsApp or a real MySQL server and does not store real secrets.
+`preview_app.py` provides a safe Gradio preview with separate tables for customers, products, locations, time periods, events, customer purchases, monthly sales, place sales, and recommendations. It also includes a dedicated management chat tab that answers business questions in Arabic or English. The preview does not connect to WhatsApp or a real MySQL server and does not store real secrets.
 
 ## Project status
 

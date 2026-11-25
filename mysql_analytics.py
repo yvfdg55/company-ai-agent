@@ -174,8 +174,14 @@ def analytics_snapshot(days: int = 30, config: dict[str, Any] | None = None) -> 
         products = cursor.fetchall()
         cursor.execute("SELECT DATE(created_at) AS day, HOUR(created_at) AS hour, COUNT(*) AS events FROM customer_events WHERE created_at >= (NOW() - INTERVAL %s DAY) GROUP BY DATE(created_at), HOUR(created_at) ORDER BY day DESC, hour", (days,))
         time = cursor.fetchall()
+        cursor.execute("SELECT c.phone, COALESCE(NULLIF(c.name,''), c.phone) AS customer, COUNT(o.id) AS orders, COALESCE(SUM(o.amount),0) AS purchases FROM orders o JOIN customers c ON c.phone=o.phone WHERE o.created_at >= (NOW() - INTERVAL %s DAY) GROUP BY c.phone, c.name ORDER BY purchases DESC, orders DESC LIMIT 20", (days,))
+        top_customers = cursor.fetchall()
+        cursor.execute("SELECT DATE_FORMAT(o.created_at, '%%Y-%%m') AS month, COUNT(o.id) AS orders, COALESCE(SUM(o.amount),0) AS sales FROM orders o WHERE o.created_at >= (NOW() - INTERVAL %s DAY) GROUP BY DATE_FORMAT(o.created_at, '%%Y-%%m') ORDER BY month", (days,))
+        monthly_sales = cursor.fetchall()
+        cursor.execute("SELECT COALESCE(NULLIF(c.city,''),'غير محدد') AS place, COUNT(o.id) AS orders, COALESCE(SUM(o.amount),0) AS sales FROM orders o JOIN customers c ON c.phone=o.phone WHERE o.created_at >= (NOW() - INTERVAL %s DAY) GROUP BY COALESCE(NULLIF(c.city,''),'غير محدد') ORDER BY sales DESC", (days,))
+        sales_by_place = cursor.fetchall()
         cursor.close()
-    return {"days": days, "overview": overview, "by_place": by_place, "orders": orders, "tickets": tickets, "events": events, "products": products, "time": time}
+    return {"days": days, "overview": overview, "by_place": by_place, "orders": orders, "tickets": tickets, "events": events, "products": products, "time": time, "top_customers": top_customers, "monthly_sales": monthly_sales, "sales_by_place": sales_by_place}
 
 
 def recommend_actions(snapshot: dict[str, Any]) -> list[dict[str, str]]:
