@@ -20,6 +20,10 @@ CONFIG = {
     "WHATSAPP_VERIFY_TOKEN": "",
     "WHATSAPP_APP_SECRET": "",
     "WA_API_VERSION": "vXX.X",
+    "MYSQL_HOST": "127.0.0.1",
+    "MYSQL_PORT": 3306,
+    "MYSQL_DATABASE": "company_agent",
+    "MYSQL_USER": "company_agent",
 }
 
 STATE = {
@@ -40,15 +44,15 @@ ENABLED_TOOLS = {
 }
 
 PRODUCTS = [
-    {"Product Name": "Product A", "Price": 120, "Stock": 25, "Category": "منتجات"},
-    {"Product Name": "Product B", "Price": 85, "Stock": 12, "Category": "منتجات"},
-    {"Product Name": "خدمة الدعم المميز", "Price": 250, "Stock": "متاح", "Category": "خدمات"},
-    {"Product Name": "باقة الشركات", "Price": 900, "Stock": 4, "Category": "باقات"},
+    {"Product Name": "Product A", "Price": 120, "Stock": 25, "Category": "منتجات", "Updated": "اليوم"},
+    {"Product Name": "Product B", "Price": 85, "Stock": 12, "Category": "منتجات", "Updated": "أمس"},
+    {"Product Name": "خدمة الدعم المميز", "Price": 250, "Stock": "متاح", "Category": "خدمات", "Updated": "اليوم"},
+    {"Product Name": "باقة الشركات", "Price": 900, "Stock": 4, "Category": "باقات", "Updated": "قبل يومين"},
 ]
 
 CUSTOMERS = [
-    {"phone": "01000000000", "name": "عميل تجريبي 1", "messages": 12, "last_seen": "اليوم"},
-    {"phone": "01000000001", "name": "Test Customer", "messages": 7, "last_seen": "أمس"},
+    {"phone": "01000000000", "name": "عميل تجريبي 1", "city": "القاهرة", "messages": 12, "last_seen": "اليوم"},
+    {"phone": "01000000001", "name": "Test Customer", "city": "الإسكندرية", "messages": 7, "last_seen": "أمس"},
 ]
 
 CUSTOM_CSS = """
@@ -225,6 +229,61 @@ def update_model(model):
     return f"تم تغيير النموذج إلى {model} في المعاينة."
 
 
+PREVIEW_EVENTS = [
+    {"phone": "01000000000", "event_type": "product_view", "product_name": "Product A", "value": 1, "city": "القاهرة"},
+    {"phone": "01000000000", "event_type": "order_created", "product_name": "Product A", "value": 120, "city": "القاهرة"},
+    {"phone": "01000000001", "event_type": "product_view", "product_name": "Product B", "value": 1, "city": "الإسكندرية"},
+    {"phone": "01000000001", "event_type": "support_ticket", "value": 1, "city": "الإسكندرية"},
+    {"phone": "DASHBOARD_TEST_CUSTOMER", "event_type": "product_view", "value": 1, "city": "الجيزة"},
+]
+
+
+def mysql_preview_settings(host, port, database, user):
+    CONFIG.update({"MYSQL_HOST": host or "127.0.0.1", "MYSQL_PORT": int(port or 3306), "MYSQL_DATABASE": database or "company_agent", "MYSQL_USER": user or "company_agent"})
+    STATE["last_action"] = "تم حفظ إعدادات MySQL في الذاكرة فقط"
+    return "تم حفظ الإعدادات للمعاينة. لن يتم الاتصال بقاعدة MySQL حقيقية من هذه الصفحة."
+
+
+def preview_analytics(days=30):
+    customers = pd.DataFrame(CUSTOMERS)
+    events = pd.DataFrame(PREVIEW_EVENTS)
+    products = pd.DataFrame(PRODUCTS)
+    if customers.empty:
+        empty = pd.DataFrame()
+        return "لا توجد بيانات عملاء.", empty, empty, empty, empty, empty
+    by_city = customers.groupby("city", dropna=False).agg(customers=("phone", "count"), messages=("messages", "sum")).reset_index().sort_values("customers", ascending=False)
+    customer_table = customers[["phone", "name", "city", "messages", "last_seen"]].sort_values("messages", ascending=False)
+    product_events = events[events["event_type"].isin(["product_view", "order_created"])].copy()
+    product_table = products[["Product Name", "Category", "Price", "Stock", "Updated"]].copy()
+    if product_events.empty:
+        product_table["events"] = 0
+        product_table["event_value"] = 0
+    else:
+        product_counts = product_events.groupby("product_name").agg(events=("event_type", "count"), event_value=("value", "sum")).reset_index()
+        product_table = product_table.merge(product_counts, left_on="Product Name", right_on="product_name", how="left").drop(columns=["product_name"])
+        product_table[["events", "event_value"]] = product_table[["events", "event_value"]].fillna(0)
+    event_summary = events.groupby("event_type").agg(total=("phone", "count"), value=("value", "sum")).reset_index()
+    time_table = pd.DataFrame([
+        {"period": "اليوم", "messages": 24, "orders": 3, "tickets": 2, "peak": "10:00-12:00"},
+        {"period": "أمس", "messages": 19, "orders": 2, "tickets": 1, "peak": "14:00-16:00"},
+        {"period": "قبل أمس", "messages": 31, "orders": 4, "tickets": 3, "peak": "18:00-20:00"},
+    ])
+    total = len(customers)
+    messages = int(customers["messages"].sum())
+    recommendations = []
+    if len(events[events["event_type"] == "product_view"]) > len(events[events["event_type"] == "order_created"]):
+        recommendations.append("متابعة العملاء الذين شاهدوا المنتجات ولم ينشئوا طلبًا.")
+    if len(events[events["event_type"] == "support_ticket"]) >= 1:
+        recommendations.append("مراجعة تذاكر الدعم في الإسكندرية وتحسين الردود المتكررة.")
+    if total and messages / total >= 8:
+        recommendations.append("إعداد ردود تلقائية للأسئلة المتكررة لأن معدل التفاعل مرتفع.")
+    if not recommendations:
+        recommendations.append("الاستمرار في جمع البيانات؛ لا توجد إشارة حرجة في الفترة المحددة.")
+    text = "تحليل تلقائي تجريبي\n" + "\n".join(f"- {item}" for item in recommendations)
+    return text, customer_table, product_table, by_city, time_table, event_summary
+
+
+
 with gr.Blocks(title="Company AI Agent Advanced Preview") as demo:
     gr.HTML("""<div id='main-header' dir='rtl'><h1>🤖 مركز التحكم المتقدم بالوكيل الذكي</h1><p>Company AI Agent Advanced Control Center</p><span>معاينة آمنة ببيانات تجريبية — لا توجد اتصالات حقيقية</span></div>""")
     with gr.Tab("📊 الرئيسية"):
@@ -292,6 +351,29 @@ with gr.Blocks(title="Company AI Agent Advanced Preview") as demo:
         permissions_btn = gr.Button("حفظ الصلاحيات", variant="primary")
         permissions_status = gr.Textbox(label="النتيجة")
         permissions_btn.click(apply_tool_permissions, toggles, permissions_status)
+    with gr.Tab("📈 التحليلات والتوصيات"):
+        gr.Markdown("## إحصاءات العملاء والأماكن والتحليل التلقائي")
+        gr.Markdown("هذه النتائج تجريبية من بيانات المعاينة. في التشغيل الحقيقي تُقرأ من MySQL.")
+        analytics_days = gr.Number(label="عدد الأيام", value=30, precision=0)
+        analytics_btn = gr.Button("تشغيل التحليل", variant="primary")
+        analytics_summary = gr.Textbox(label="التوصيات المقترحة", lines=6)
+        customer_analytics_table = gr.Dataframe(label="جدول العملاء والتفاعل", interactive=False)
+        product_analytics_table = gr.Dataframe(label="جدول المنتجات والأسعار والمخزون", interactive=False)
+        city_table = gr.Dataframe(label="جدول العملاء حسب المكان", interactive=False)
+        time_table = gr.Dataframe(label="جدول الوقت والذروة", interactive=False)
+        event_table = gr.Dataframe(label="جدول الأحداث وسلوك العملاء", interactive=False)
+        analytics_btn.click(preview_analytics, analytics_days, [analytics_summary, customer_analytics_table, product_analytics_table, city_table, time_table, event_table])
+        gr.Markdown("## إعداد اتصال MySQL للتحليلات المركزية")
+        with gr.Row():
+            mysql_host = gr.Textbox(label="MYSQL_HOST", value=CONFIG["MYSQL_HOST"])
+            mysql_port = gr.Number(label="MYSQL_PORT", value=CONFIG["MYSQL_PORT"], precision=0)
+        with gr.Row():
+            mysql_database = gr.Textbox(label="MYSQL_DATABASE", value=CONFIG["MYSQL_DATABASE"])
+            mysql_user = gr.Textbox(label="MYSQL_USER", value=CONFIG["MYSQL_USER"])
+        mysql_save = gr.Button("حفظ إعدادات MySQL", variant="primary")
+        mysql_status = gr.Textbox(label="الحالة")
+        mysql_save.click(mysql_preview_settings, [mysql_host, mysql_port, mysql_database, mysql_user], mysql_status)
+
     with gr.Tab("⚙️ الإعدادات والتكاملات"):
         gr.Markdown("## إعدادات Ollama")
         model_name = gr.Textbox(label="اسم نموذج Ollama", value=CONFIG["OLLAMA_MODEL"])
