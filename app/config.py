@@ -17,6 +17,7 @@ class Settings:
     whatsapp_phone_number_id: str = os.getenv("PHONE_NUMBER_ID", "")
     customer_agent_provider: str = os.getenv("CUSTOMER_AGENT_PROVIDER", "local")
     management_agent_provider: str = os.getenv("MANAGEMENT_AGENT_PROVIDER", "local")
+    management_auth_token: str = os.getenv("MANAGEMENT_AUTH_TOKEN", "")
 
     def validate(self) -> None:
         if self.max_history < 1 or self.max_history > 100:

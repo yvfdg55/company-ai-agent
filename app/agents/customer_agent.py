@@ -11,6 +11,7 @@ from ..models import IncomingMessage
 from ..tool_registry import ToolRegistry
 from ..tools.customer_actions import create_support_ticket, save_order_draft
 from ..tools.products import calculate_product, search_products
+from ..search import rank_records
 
 
 class CustomerAgent:
@@ -23,8 +24,8 @@ class CustomerAgent:
         self.tools = ToolRegistry(audit)
         self.tools.register("search_products", lambda query: search_products(self.products, query))
         self.tools.register("calculate_product", lambda product_name, quantity: calculate_product(self.products, product_name, quantity))
-        self.tools.register("create_support_ticket", lambda phone, subject, details: create_support_ticket(phone, subject, details))
-        self.tools.register("save_order_draft", lambda phone, details: save_order_draft(phone, details))
+        self.tools.register("create_support_ticket", lambda phone, subject, details: create_support_ticket(phone, subject, details, database=audit.database))
+        self.tools.register("save_order_draft", lambda phone, details: save_order_draft(phone, details, database=audit.database))
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> "CustomerAgent":
@@ -56,7 +57,7 @@ class CustomerAgent:
             names = [str(row.get("Product Name", row.get("product_name", ""))) for row in result.data["products"][:5]]
             return "المنتجات المطابقة في بيانات الشركة: " + ", ".join(name for name in names if name)
         if self.llm and self.llm.health():
-            context = self.products[:20]
+            context = rank_records(self.products, text, 8)
             try:
                 return self.llm.answer(text, context)
             except Exception:

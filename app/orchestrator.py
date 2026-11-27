@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Protocol
+import os
+import hmac
 
 from .audit import AuditLog
 from .agents.providers import ExternalAPIProvider, provider_from_env
@@ -46,9 +48,12 @@ class AgentOrchestrator:
             raise ValueError("Invalid or reserved agent name")
         self.agents[name] = agent
 
-    def decide(self, message: IncomingMessage, actor_role: str = "customer") -> RouteDecision:
+    def decide(self, message: IncomingMessage, actor_role: str = "customer", auth_token: str | None = None) -> RouteDecision:
         role = (actor_role or "customer").casefold()
         if role in {"manager", "admin", "owner", "operations"}:
+            required = os.getenv("MANAGEMENT_AUTH_TOKEN", "")
+            if required and not auth_token or required and not hmac.compare_digest(required, auth_token or ""):
+                return RouteDecision("management", "management authentication required", allowed=False)
             if "management" in self.agents:
                 return RouteDecision("management", "trusted management role")
             return RouteDecision("customer", "management agent is not configured")
@@ -57,8 +62,8 @@ class AgentOrchestrator:
         # A customer may mention reports or sales, but that must never grant admin access.
         return RouteDecision("customer", "external customer channel")
 
-    def dispatch(self, message: IncomingMessage, actor_role: str = "customer") -> str:
-        decision = self.decide(message, actor_role)
+    def dispatch(self, message: IncomingMessage, actor_role: str = "customer", auth_token: str | None = None) -> str:
+        decision = self.decide(message, actor_role, auth_token)
         agent = self.agents.get(decision.agent)
         if agent is None or not decision.allowed:
             raise RuntimeError("No permitted agent is configured for this request")

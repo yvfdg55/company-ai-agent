@@ -150,3 +150,23 @@ Company product data must include `Product Name` and `Price`; `Stock`, `Category
 ## Unified Data Layer
 
 `app/data/manager.py` and `app/data/connectors.py` provide the first unified data layer. They normalize rows and document pages into `UnifiedRecord` objects that retain source, type, structured fields, metadata, confidence, and stable IDs. The current connectors support Excel, CSV, JSON, SQLite, MySQL, PDF, and DOCX. Use `DataSourceManager.ingest_file(...)`, `ingest_sqlite(...)`, or `ingest_mysql(...)`, then search with `DataSourceManager.search(...)`. Image OCR, audio transcription, and external API connectors remain later adapters rather than being silently treated as text files.
+
+## Development, tests, and operational limits
+
+Install runtime and development dependencies with:
+```bash
+python -m pip install -r requirements-dev.txt
+pytest -q
+python scripts/smoke_test.py
+```
+GitHub Actions runs the same `pytest -q` and no-network smoke test on pushes and pull requests. Tests use temporary SQLite databases and fakes; they do not call WhatsApp, Ollama, MySQL, or any external API.
+
+Company search is a dependency-light lexical hybrid: Arabic diacritic removal and common-letter normalization are combined with token overlap, exact-phrase boosting, and TF-IDF cosine ranking. It is not an embedding system and does not claim semantic vector retrieval. `CustomerAgent` passes the highest-ranked records to Ollama for grounded answers when Ollama is healthy; if Ollama is unavailable or errors, it returns a safe deterministic fallback.
+
+`create_support_ticket` and `save_order_draft` persist to SQLite tables (`support_tickets` and `order_drafts`) with review status and UTC timestamps. Both always return `approval_required=true`; neither confirms an order or performs payment. Pass an explicit `database` path in integrations, or use `DATABASE` for the default local path.
+
+Audit details are sanitized before storage: secret/token/password/API-key fields and payment/card/bank fields are redacted, and long string values are truncated. This is a logging safeguard, not a substitute for encryption or access control.
+
+Management roles remain restricted by routing policy. If `MANAGEMENT_AUTH_TOKEN` is non-empty, a matching token must also be supplied to `AgentOrchestrator.dispatch(..., actor_role="manager", auth_token=...)`; a role string alone is rejected. Keep the token only in the runtime environment and never commit it. The current Flask webhook exposes customer messaging and health/verification endpoints; management authorization is enforced at the orchestrator boundary rather than by adding an unaudited admin HTTP endpoint.
+
+Ollama, WhatsApp Cloud API, Google Sheets, and MySQL are optional runtime integrations. Real credentials, customer data, and production service availability are required for those integrations; the local tests intentionally do not validate network connectivity. Review all drafts and tickets with a human before taking business action.

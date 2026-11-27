@@ -6,6 +6,7 @@ from typing import Any
 
 from .connectors import load_file, load_mysql, load_sqlite
 from .unified import UnifiedRecord
+from ..search import rank_records
 
 
 class DataSourceManager:
@@ -28,16 +29,8 @@ class DataSourceManager:
         return self.add(load_mysql(config, tables))
 
     def search(self, query: str, data_type: str | None = None, limit: int = 20) -> list[UnifiedRecord]:
-        terms = [term for term in str(query or "").casefold().split() if term]
         candidates = [record for record in self.records if data_type is None or record.data_type == data_type]
-        ranked = []
-        for record in candidates:
-            text = record.searchable_text()
-            score = sum(text.count(term) for term in terms)
-            if score:
-                ranked.append((score, record))
-        ranked.sort(key=lambda item: item[0], reverse=True)
-        return [record for _, record in ranked[:max(1, min(limit, 100))]]
+        return rank_records(candidates, query, limit)
 
     def summary(self) -> dict[str, Any]:
         return {"total": len(self.records), "by_source": dict(Counter(record.source for record in self.records)), "by_type": dict(Counter(record.data_type for record in self.records))}
