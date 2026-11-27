@@ -499,4 +499,4 @@ with gr.Blocks(title="Company AI Agent Advanced Preview") as demo:
 
 
 demo.queue(default_concurrency_limit=4)
-demo.launch(server_name="0.0.0.0", server_port=7860, share=False, quiet=True, theme=gr.themes.Soft(primary_hue="blue", secondary_hue="slate", neutral_hue="slate"), css=CUSTOM_CSS)
+demo.launch(server_name="127.0.0.1", server_port=7860, share=False, quiet=True, theme=gr.themes.Soft(primary_hue="blue", secondary_hue="slate", neutral_hue="slate"), css=CUSTOM_CSS)

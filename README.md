@@ -101,3 +101,52 @@ The Flask webhook listens on port `5000` by default.
 ## Project status
 
 This project is an initial local autonomous-agent implementation intended for controlled business operations and human review of preliminary orders.
+
+## Management Agent
+
+`management_agent.py` adds a separate read-only management agent. It reuses `mysql_analytics.py` for KPIs and operational recommendations and `recommendation_engine.py` for explainable customer and product recommendations. MySQL is the default provider; set `MANAGEMENT_DATA_PROVIDER=sqlite` to use the local SQLite database when central analytics are unavailable.
+
+Example:
+
+```python
+from management_agent import ManagementAgent
+
+agent = ManagementAgent()
+report = agent.analyze(days=30)
+print(report["recommendations"])
+print(agent.answer("ما التوصيات الإدارية؟", days=30))
+```
+
+The management agent is read-only: it does not send campaigns, change prices or inventory, confirm orders, or perform other business actions. Every recommendation is marked for human review. When Ollama is unavailable, deterministic grounded answers remain available with `agent.answer(question, use_llm=False)`.
+
+## Agent Platform Foundation
+
+The new `app/` package is the foundation for the company-wide agent platform. It currently includes shared settings, domain models, central policies, an SQLite audit log, a constrained tool registry, product tools, reviewable customer actions, and the first `CustomerAgent`. The customer agent is deliberately limited to product lookup, price-tool integration, support-ticket requests, and reviewable order drafts.
+
+The foundation is tested with direct Python tests in `tests/test_foundation.py`. The environment used for development does not include pytest, so the same scenarios were also executed through a standalone Python test run. WhatsApp transport and the Ollama orchestration layer will be connected after these shared contracts are stabilized.
+
+The next integration layer is now present: `app/data/company.py` loads company records from Excel, `app/llm/ollama.py` provides grounded Ollama responses, `app/channels/whatsapp.py` verifies and parses WhatsApp Cloud API events, and `app/runtime.py` connects the channel to `CustomerAgent` with duplicate-message protection. The channel sender is still not activated against real credentials until the runtime configuration is explicitly tested.
+
+The standalone Flask Webhook is in `app/server.py`:
+
+```bash
+python -m app.server
+```
+
+It exposes `GET /health`, `GET /webhook` for Meta verification, and `POST /webhook` for signed WhatsApp events. The local test suite verifies signature validation, challenge verification, response delivery through a fake channel, and duplicate-message protection. Real startup requires `WHATSAPP_TOKEN`, `PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, and a readable `company.xlsx` file.
+
+For local setup, copy [`.env.example`](./.env.example) to `.env`, install [the requirements](./requirements.txt), and run the no-network smoke test:
+
+```bash
+cp .env.example .env
+pip install -r requirements.txt
+python scripts/smoke_test.py
+```
+
+The real local launcher is `python scripts/run_webhook.py`; it refuses to start when the required WhatsApp credentials or company data are missing.
+
+Company product data must include `Product Name` and `Price`; `Stock`, `Category`, `Updated`, and `Description` are optional. The validator rejects empty product names and invalid or negative prices. To create a separate local sample workbook without overwriting a real file, run `python scripts/create_sample_company.py`; it creates [sample_company.xlsx](./sample_company.xlsx).
+
+## Unified Data Layer
+
+`app/data/manager.py` and `app/data/connectors.py` provide the first unified data layer. They normalize rows and document pages into `UnifiedRecord` objects that retain source, type, structured fields, metadata, confidence, and stable IDs. The current connectors support Excel, CSV, JSON, SQLite, MySQL, PDF, and DOCX. Use `DataSourceManager.ingest_file(...)`, `ingest_sqlite(...)`, or `ingest_mysql(...)`, then search with `DataSourceManager.search(...)`. Image OCR, audio transcription, and external API connectors remain later adapters rather than being silently treated as text files.

@@ -1,0 +1,26 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*credentials*.json
+secrets/
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+company.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local tooling
+.DS_Store
+.vscode/
+.idea/

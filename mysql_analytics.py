@@ -19,6 +19,8 @@ MYSQL_CONFIG = {
     "database": os.getenv("MYSQL_DATABASE", "company_agent"),
     "user": os.getenv("MYSQL_USER", "company_agent"),
     "password": os.getenv("MYSQL_PASSWORD", ""),
+    # Keep DB timestamps and reporting windows in UTC.
+    "time_zone": "+00:00",
 }
 
 MYSQL_SCHEMA = """
